@@ -230,54 +230,6 @@ Use `--mode r` or `--mode g`.
 
 ---
 
-## .gitignore (recommended)
-
-The uploaded `.gitignore` contains Markdown formatting (headers and code fences). Use a plain `.gitignore` like below:
-
-```
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
-
-# Build artifacts / caches
-.dist/
-dist/
-build/
-.cache/
-.tmp/
-tmp/
-*.log
-
-# OS cruft
-.DS_Store
-Thumbs.db
-
-# Env / editors
-.env
-.env.*
-.vscode/
-.idea/
-
-# Inputs/outputs for this project
-input/
-output/frames/
-output/sprites/
-output/thumbs/
-debug/
-
-# Misc
-*.bak
-*.orig
-```
-
----
-
 ## License
 
-The repo’s `package.json` declares **ISC**. You can change to MIT or any other if needed.
+Internal project. Use freely as you like.

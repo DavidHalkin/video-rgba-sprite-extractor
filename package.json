@@ -1,0 +1,19 @@
+{
+  "name": "png",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "frames:all": "node scripts/batch_extract_rgba.js --mode union --fps 24 --concurrency 3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.3.2",
+    "sharp": "^0.34.4"
+  }
+}

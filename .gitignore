@@ -1,0 +1,47 @@
+
+---
+
+# .gitignore
+
+```gitignore
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build artifacts / caches
+.dist/
+dist/
+build/
+.cache/
+.tmp/
+tmp/
+*.log
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Environment / editor
+.env
+.env.*
+.vscode/
+.idea/
+
+# input from this project
+input
+
+# Output from this project
+output/frames/
+output/sprites/
+output/thumbs/
+debug/
+
+# Misc
+*.bak
+*.orig

@@ -110,6 +110,28 @@ node scripts/batch_extract_rgba.js   --mode weighted --wr 0.7 --wg 0.3   --alpha
 node scripts/batch_extract_rgba.js --mode union --split 400 --sprite true
 ```
 
+### 6) Build sprites only (from already extracted / edited frames)
+
+If you have already extracted frames (and optionally deleted or edited some), you can build the sprite atlas + JSON manifest **without re-running ffmpeg**:
+
+```bash
+# Build sprites for all subfolders in output/frames/*
+node scripts/batch_extract_rgba.js --spriteOnly true
+
+# Build sprite for one or more specific base folders
+node scripts/batch_extract_rgba.js --spriteOnly true --onlyBase my_video_01,my_video_02
+
+# You can also pass a full path to a frames folder
+node scripts/batch_extract_rgba.js --spriteOnly true --onlyBase output/frames/my_video_01
+```
+
+Outputs per `<basename>`:
+
+- Atlas: `output/sprites/<basename>.png`
+- Manifest: `output/sprites/<basename>.json`
+
+This mode is useful if you want to manually curate frames (remove unnecessary ones, reorder, etc.) before packing them into a sprite sheet.
+
 **Outputs per video `<basename>`:**
 
 - Frames: `output/frames/<basename>/000001.png`, `000002.png`, …
@@ -138,13 +160,15 @@ node scripts/batch_extract_rgba.js --mode union --split 400 --sprite true
 
 ### Sprite options (if `--sprite true`)
 
-| Option             | Type             | Default | Description                                    |
-| ------------------ | ---------------- | ------: | ---------------------------------------------- |
-| `--sprite`         | `true/false`     | `false` | Build a sprite atlas after extracting frames   |
-| `--spriteMaxWidth` | number           |  `4096` | Max sheet width (grid packing)                 |
-| `--spritePadding`  | number           |     `2` | Spacing between frames in the atlas            |
-| `--spriteName`     | string \| `auto` |  `auto` | Output atlas name; `auto` = video basename     |
-| `--spriteEvery`    | number           |     `1` | Take every N-th frame (2 = every second frame) |
+| Option             | Type                                  | Default | Description                                                                   |
+| ------------------ | ------------------------------------- | ------: | ----------------------------------------------------------------------------- |
+| `--sprite`         | `true/false`                          | `false` | Build a sprite atlas after extracting frames                                  |
+| `--spriteMaxWidth` | number                                |  `4096` | Max sheet width (grid packing)                                                |
+| `--spritePadding`  | number                                |     `2` | Spacing between frames in the atlas                                           |
+| `--spriteName`     | string \| `auto`                      |  `auto` | Output atlas name; `auto` = video basename                                    |
+| `--spriteEvery`    | number                                |     `1` | Take every N-th frame (2 = every second frame)                                |
+| `--spriteOnly`     | `true/false`                          | `false` | Skip extraction, build sprite(s) only from existing frames in `output/frames` |
+| `--onlyBase`       | string (comma-separated list or path) |       – | Restrict sprite build to specific base folder(s)                              |
 
 ---
 

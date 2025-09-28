@@ -15,7 +15,10 @@
 //   --split half|<pixels>             ("half" or exact bottom height in px)
 //   --concurrency N                   (how many videos to process in parallel)
 //
-// Sprite options (if --sprite true):
+// Sprite options:
+//   --sprite true|false               (build sprite right after extraction)
+//   --spriteOnly true|false           (build sprite(s) from existing frames only; no ffmpeg)
+//   --onlyBase name1[,name2...]       (which base folder(s) from output/frames to pack; can be full paths)
 //   --spriteMaxWidth 4096
 //   --spritePadding 2
 //   --spriteName auto                 (or a custom name for output atlas)
@@ -57,6 +60,8 @@ const CONC = Number(get("concurrency", String(Math.max(1, Math.min(4, (os.cpus()
 
 // Sprite
 const DO_SPRITE = (get("sprite", "false") + "").toLowerCase() === "true";
+const SPRITE_ONLY = (get("spriteOnly", "false") + "").toLowerCase() === "true";
+const ONLY_BASE = get("onlyBase", ""); // comma-separated basenames or absolute/relative dirs
 const SPRITE_MAX_W = Number(get("spriteMaxWidth", "4096"));
 const SPRITE_PADDING = Number(get("spritePadding", "2"));
 const SPRITE_NAME = get("spriteName", "auto");
@@ -117,7 +122,8 @@ function buildFilter() {
   let maskPost = maskIn;
 
   if (!(levLow === 0 && levHigh === 255)) {
-    extract.push(`${maskIn}lut=a='clamp((val-${levLow})*255/${Math.max(1, levHigh - levLow)},0,255)'[maskL]`);
+    // Note: applying LUT to the current single-plane mask stream
+    extract.push(`${maskIn}lut='clamp((val-${levLow})*255/${Math.max(1, levHigh - levLow)},0,255)'[maskL]`);
     maskPost = "[maskL]";
   }
 
@@ -138,7 +144,7 @@ function buildFilter() {
   const scaleMask = `${maskPost}scale=iw*${SCALE}:ih*${SCALE}[as]`;
 
   // Optional FPS filter
-  const fpsPart = FPS > 0 ? `[rgba]fps=${FPS}[out]` : `[rgba]copy[out]`;
+  const fpsPart = FPS > 0 ? `[rgba]fps=${FPS}[out]` : `[rgba]null[out]`; // 'null' keeps the stream unchanged
 
   return [
     "[0:v]split=2[top][bottom]",
@@ -287,12 +293,66 @@ async function buildSpriteForFolder(
   console.log(`✓ Manifest: ${outJson}`);
 }
 
+// ---------- sprite-only helper ----------
+async function runSpriteOnly() {
+  await fs.ensureDir(OUTPUT_FRAMES);
+  await fs.ensureDir(OUTPUT_SPRITES);
+
+  // Build list of bases (either provided or scan output/frames)
+  let bases = [];
+  if (ONLY_BASE) {
+    bases = ONLY_BASE.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } else {
+    const dirs = await fs.readdir(OUTPUT_FRAMES, {withFileTypes: true});
+    bases = dirs.filter((d) => d.isDirectory()).map((d) => d.name);
+  }
+
+  if (bases.length === 0) {
+    console.log("No frame folders found to pack (output/frames is empty).");
+    return;
+  }
+
+  for (const entry of bases) {
+    let framesDir;
+    let baseName;
+
+    // Allow absolute/relative paths, or just basenames under output/frames
+    if (entry.includes(path.sep) || path.isAbsolute(entry)) {
+      framesDir = entry;
+      baseName = path.basename(entry);
+    } else {
+      baseName = entry;
+      framesDir = path.join(OUTPUT_FRAMES, baseName);
+    }
+
+    const exists = await fs.pathExists(framesDir);
+    if (!exists) {
+      console.warn(`(sprite-only) Skip: ${framesDir} does not exist`);
+      continue;
+    }
+
+    console.log(`(sprite-only) Packing: ${framesDir}`);
+    await buildSpriteForFolder(framesDir, baseName);
+  }
+
+  console.log("\nDone (sprite-only).");
+}
+
 // ---------- main ----------
 (async () => {
   await fs.ensureDir(OUTPUT_FRAMES);
   await fs.ensureDir(OUTPUT_SPRITES);
 
-  const entries = await fs.readdir(INPUT_DIR);
+  // Sprite-only mode: skip ffmpeg/extract, just pack existing frames
+  if (SPRITE_ONLY) {
+    await runSpriteOnly();
+    process.exit(0);
+  }
+
+  // Regular path: extract frames from input videos, then (optionally) build sprites
+  const entries = await fs.readdir(INPUT_DIR).catch(() => []);
   const videos = entries.filter((f) => VIDEO_EXT.has(path.extname(f).toLowerCase())).map((f) => path.join(INPUT_DIR, f));
 
   if (videos.length === 0) {

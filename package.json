@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "frames:all": "node scripts/batch_extract_rgba.js --mode union --fps 24 --concurrency 3"
+    "frames:all": "node scripts/batch_extract_rgba.js --mode union --fps 30 --concurrency 3"
   },
   "keywords": [],
   "author": "",

@@ -257,3 +257,106 @@ Use `--mode r` or `--mode g`.
 ## License
 
 Internal project. Use freely as you like.
+
+---
+
+## 🇬🇧 English Addendum — Units Extraction and Sprite Export
+
+This section describes the updated workflow for extracting animation frames and building sprites automatically
+based on the configuration from `units-battle.js`.
+
+### 🧩 Overview
+
+The export system reads `units-battle.js`, which defines the animation phases (`idle`, `attack`, `move`, etc.)
+and the frame-selection logic for each unit (`U1`, `U2`, etc.).  
+If a phase does not specify its own `frames`, a global default from `config_U` is used.
+
+### ⚙️ Global Config
+
+At the top of `units-battle.js` you can define a global fallback rule:
+
+```js
+const config_U = {
+  frames: 2, // number of central frames to take if no "frames" are specified
+};
+```
+
+This ensures that even if a phase does not define its own `frames` property, a few frames
+will still be picked automatically from the center of that animation segment.
+
+### 📁 Output Structure
+
+```
+outputExtracted/
+  frames/<VideoBase>/*.png      ← extracted selected frames
+  sprites/<VideoBase>/<VideoBase>.png
+  sprites/<VideoBase>/<VideoBase>.json
+```
+
+### 🧠 Phase Frame Syntax
+
+In `units-battle.js`, you can describe which frames to pick:
+
+```
+frames: [1, 5, 10]        → manual list
+frames: "1,10,20"         → comma-separated values
+frames: "10-30"           → continuous range
+frames: "10-50x5"         → every 5th frame
+frames: "1,10,20-30x2,50" → mixed format
+frames: "all"             → all frames in this phase
+```
+
+If no `frames` key exists — the script takes the central N frames (`config_U.frames`).
+
+Example:
+
+```js
+attack: {
+  start:  { start: 2, duration: 38, frames: "1,10,20,38" },
+  cycle:  { start: 42, duration: 51, frames: "1-51x5" },
+  end:    { start: 94, duration: 29, frames: [1, 15, 29] },
+},
+```
+
+### 🔄 Side Cycles
+
+Each video encodes 6 directions one after another.  
+The key `side_cycle` defines how many frames belong to each direction.  
+The system automatically calculates the correct global indices for every direction:
+
+```
+global = (side - 1) * side_cycle + (start - 1) + local
+```
+
+### 🚀 Running the Export
+
+1. Extract RGBA frames once using:
+
+   ```bash
+   npm run frames:all
+   # or manually:
+   node scripts/batch_extract_rgba.js --mode union --fps 24 --concurrency 3
+   ```
+
+2. Configure your `units-battle.js`.
+
+3. Run the exporter to build frames and sprites for all units automatically:
+   ```bash
+   node scripts/export_all_units.js
+   ```
+
+### 💬 FAQ
+
+**Q: Do I need to re-run frame extraction every time?**  
+A: No. Once RGBA frames exist in `output/frames`, only `export_all_units.js` is needed.
+
+**Q: What happens if no phase defines `frames`?**  
+A: The exporter will automatically take `config_U.frames` center frames from each phase.
+
+**Q: Why does my U7 have only one frame?**  
+A: Make sure folder names match correctly — `U7_1` → `U7_Battle`, `U7` → `U7`.
+
+**Q: Where are results saved?**  
+A: Under `outputExtracted/frames/` and `outputExtracted/sprites/`.
+
+---

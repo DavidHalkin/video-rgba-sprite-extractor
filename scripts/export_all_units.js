@@ -12,7 +12,7 @@ const OUT_ROOT = path.resolve("outputExtracted"); // сюда всё сложи�
 const OUT_FRAMES_ROOT = path.join(OUT_ROOT, "frames"); // копии нужных кадров
 const OUT_SPRITES_ROOT = path.join(OUT_ROOT, "sprites"); // спрайты и json
 const SIDES_DEFAULT = [1, 2, 3, 4, 5, 6]; // все 6 направлений
-const SPRITE_PADDING = 2; // px
+const SPRITE_PADDING = 1; // px
 const SPRITE_MAX_W = 4096; // px
 /* ================================= */
 
@@ -136,6 +136,7 @@ function isPair(o) {
 
 function parseFramesSpec(spec, dur) {
   // spec: [1,3,7] | "all" | "10-50" | "10-50x5" | "1,3,10-20x2"
+  // ВНИМАНИЕ: числовой spec обрабатывается НЕ здесь, а в collectAbsoluteFrames (как "N центральных кадров"). // CHANGED
   if (!spec) return [];
   if (Array.isArray(spec)) {
     return spec
@@ -190,6 +191,7 @@ function centerFrames(dur, count) {
 /** собрать глобальные номера кадров с учётом:
  *  - frames-спеков (если заданы)
  *  - ИНАЧЕ центра фазы (config_U.frames)
+ *  - ОСОБЫЙ СЛУЧАЙ: frames как ЧИСЛО → взять N центральных кадров фазы (перебивает config_U.frames) // CHANGED
  */
 function collectAbsoluteFrames(unitCfg, sidesArr, defaultCenterCount) {
   // набираем все фазы/подфазы в порядке объявления
@@ -223,10 +225,15 @@ function collectAbsoluteFrames(unitCfg, sidesArr, defaultCenterCount) {
     const shift = (side - 1) * sideCycle;
 
     for (const ph of phases) {
-      const picks =
-        ph.frames && parseFramesSpec(ph.frames, ph.duration).length
-          ? parseFramesSpec(ph.frames, ph.duration)
-          : centerFrames(ph.duration, defaultCenterCount);
+      let picks;
+
+      // CHANGED: если frames — целое число → трактуем как "взять N центральных"
+      if (Number.isInteger(ph.frames)) {
+        picks = centerFrames(ph.duration, ph.frames);
+      } else {
+        const parsed = parseFramesSpec(ph.frames, ph.duration);
+        picks = parsed.length ? parsed : centerFrames(ph.duration, defaultCenterCount);
+      }
 
       for (const p of picks) {
         const globalIndex = shift + (ph.start - 1) + p; // 1-индексация
@@ -283,6 +290,6 @@ async function makeSprite(files, outPng, outJson) {
       rows,
       frames: manifest,
     },
-    {spaces: 2}
+    {spaces: 1}
   );
 }

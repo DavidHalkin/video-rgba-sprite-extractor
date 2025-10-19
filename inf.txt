@@ -1,0 +1,9 @@
+поймать все  фреймы
+node scripts/batch_extract_rgba.js --mode union --fps 30 --concurrency 3
+
+потом настройка units-battle.js  и 
+node scripts/export_all_units.js        
+
+клины
+node .\scripts\clean_and_pack.js --src "outputExtracted\frames" --dst "clean" --alpha 1 --canvasPad 2 --packPad 1 --anchorFrames
+ 3 --anchorMode center --debug true

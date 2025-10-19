@@ -308,34 +308,34 @@ const U8 = {
     start: {
       start: 2,
       duration: 26,
-      // frames: "all",
+      frames: 3,
     },
     cycle: {
       start: 29,
       duration: 37,
-      // frames: "1-37x3",
+      frames: [28, 30, 36],
     },
     end: {
       start: 67,
       duration: 57,
-      // frames: [1, 20, 57],
+      frames: 3,
     },
   },
   move: {
     start: {
       start: 124,
       duration: 7,
-      // frames: [1],
+      frames: 4,
     },
     cycle: {
       start: 132,
       duration: 33,
-      // frames: "1-33x3",
+      frames: 4,
     },
     end: {
       start: 166,
       duration: 25,
-      // frames: [1, 25],
+      frames: 4,
     },
   },
 };
@@ -420,8 +420,8 @@ const U11 = {
     start: {
       start: 2,
       duration: 248,
+      frames: [5, 13, 29, 57, 70],
     },
-    // frames: "1-248x8",
   },
 };
 
@@ -436,23 +436,23 @@ const U12 = {
     start: {
       start: 124,
       duration: 7,
-      // frames: [1],
+      // frames: 4,
     },
     cycle: {
       start: 132,
       duration: 33,
-      // frames: "1-33x3",
+      // frames: 4,
     },
     end: {
       start: 166,
       duration: 25,
-      // frames: [1, 25],
+      // frames: 4,
     },
   },
   attack: {
     start: 191,
     duration: 59,
-    // frames: "1-59x6",
+    frames: "1-10",
   },
 };
 
@@ -514,7 +514,7 @@ const U14 = {
   attack: {
     start: 2,
     duration: 138,
-    // frames: "1-138x6",
+    frames: [5, 13, 29, 57, 130],
   },
 };
 

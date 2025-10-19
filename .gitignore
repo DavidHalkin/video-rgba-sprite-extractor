@@ -38,6 +38,7 @@ input
 outputExtracted/
 old/
 output/
+clean/
 # Output from this project
 output/frames/
 output/sprites/

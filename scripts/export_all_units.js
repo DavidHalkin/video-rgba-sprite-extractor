@@ -7,17 +7,16 @@ import {pathToFileURL} from "url";
 
 /* ============ CONFIG ============ */
 const UNITS_FILE = path.resolve("units-battle.js"); // лежит в корне
-const FRAMES_IN_ROOT = path.resolve("output/frames"); // здесь уже лежат исходные PNG (000001.png…)
+const FRAMES_IN_ROOT = path.resolve("output/frames"); // исходные PNG (000001.png…)
 const OUT_ROOT = path.resolve("outputExtracted"); // сюда всё сложим
 const OUT_FRAMES_ROOT = path.join(OUT_ROOT, "frames"); // копии нужных кадров
 const OUT_SPRITES_ROOT = path.join(OUT_ROOT, "sprites"); // спрайты и json
-const SIDES_DEFAULT = [1, 2, 3, 4, 5, 6]; // обрабатываем все 6 направлений
+const SIDES_DEFAULT = [1, 2, 3, 4, 5, 6]; // все 6 направлений
 const SPRITE_PADDING = 2; // px
 const SPRITE_MAX_W = 4096; // px
 /* ================================= */
 
 (async () => {
-  // Проверим базовые директории
   await fs.ensureDir(FRAMES_IN_ROOT).catch(() => {
     console.error(`✖ Not found: ${FRAMES_IN_ROOT}. Сначала разложи видео в кадры.`);
     process.exit(1);
@@ -25,7 +24,7 @@ const SPRITE_MAX_W = 4096; // px
   await fs.ensureDir(OUT_FRAMES_ROOT);
   await fs.ensureDir(OUT_SPRITES_ROOT);
 
-  // Подтянем units-battle.js как ES-модуль (он в корне)
+  // Подтягиваем units-battle.js как ES-модуль (он в корне)
   let unitsMod;
   try {
     unitsMod = await import(pathToFileURL(UNITS_FILE).href);
@@ -33,10 +32,14 @@ const SPRITE_MAX_W = 4096; // px
     console.error(`✖ Не могу импортировать ${UNITS_FILE}:`, e.message);
     process.exit(1);
   }
-  const unitNames = Object.keys(unitsMod);
-  console.log("∙ Загружены константы юнитов:", unitNames.join(", "));
 
-  // Найдём все подпапки в output/frames (по одной папке на исходное видео)
+  const unitNames = Object.keys(unitsMod).filter((k) => k !== "config_U");
+  const defaultCenterCount = Number(unitsMod?.config_U?.frames) || 2;
+
+  console.log("∙ Загружены константы юнитов:", unitNames.join(", "));
+  console.log("∙ config_U.frames (по центру):", defaultCenterCount);
+
+  // Сканируем все подпапки в output/frames
   const allNames = await fs.readdir(FRAMES_IN_ROOT);
   const allStats = await Promise.all(allNames.map((n) => fs.stat(path.join(FRAMES_IN_ROOT, n))));
   const frameDirs = allNames.filter((n, i) => allStats[i].isDirectory());
@@ -48,7 +51,6 @@ const SPRITE_MAX_W = 4096; // px
 
   console.log("\n∙ Найдены папки с кадрами:", frameDirs.join(", "));
 
-  // Пройдём по каждой папке (каждое "видео")
   for (const dir of frameDirs) {
     const unitName = matchUnit(dir, unitNames);
     if (!unitName) {
@@ -63,14 +65,14 @@ const SPRITE_MAX_W = 4096; // px
 
     console.log(`\n▶ ${dir} → ${unitName} (side_cycle=${unitCfg.side_cycle})`);
 
-    // Соберём глобальные номера кадров, которые нужно взять (по frames в фазах)
-    const absFrames = collectAbsoluteFrames(unitCfg, SIDES_DEFAULT);
+    // Собираем глобальные номера кадров: frames-выражения ИЛИ (fallback) центр фазы
+    const absFrames = collectAbsoluteFrames(unitCfg, SIDES_DEFAULT, defaultCenterCount);
     if (!absFrames.length) {
-      console.warn(`  ⚠ В ${unitName} нет ключей "frames" в фазах — нечего экспортировать.`);
+      console.warn(`  ⚠ В ${unitName} пустой набор кадров — нечего экспортировать.`);
       continue;
     }
 
-    // Копируем только нужные кадры
+    // Копирование
     const srcDir = path.join(FRAMES_IN_ROOT, dir);
     const dstDir = path.join(OUT_FRAMES_ROOT, dir);
     const sprDir = path.join(OUT_SPRITES_ROOT, dir);
@@ -100,7 +102,7 @@ const SPRITE_MAX_W = 4096; // px
       continue;
     }
 
-    // Собираем спрайт
+    // Спрайт
     const spritePng = path.join(sprDir, `${dir}.png`);
     const spriteJson = path.join(sprDir, `${dir}.json`);
     await makeSprite(copied, spritePng, spriteJson);
@@ -119,15 +121,12 @@ const SPRITE_MAX_W = 4096; // px
 /* ================= HELPERS ================= */
 
 function matchUnit(videoFolderName, allUnits) {
-  // base — до первого подчёркивания или всё имя, если подчёркивания нет
+  // "U7_1" → U7_Battle (если есть), "U7" → U7
   const base = videoFolderName.split("_")[0];
   const battle = `${base}_Battle`;
-
-  // Если папка имеет суффикс "_N" (например U7_1, U7_2) и есть U7_Battle — считаем это боевым набором
   const isNumbered = /^.+_\d+$/.test(videoFolderName);
-
-  if (isNumbered && allUnits.includes(battle)) return battle; // U7_1 → U7_Battle
-  if (allUnits.includes(base)) return base; // U7   → U7
+  if (isNumbered && allUnits.includes(battle)) return battle;
+  if (allUnits.includes(base)) return base;
   return null;
 }
 
@@ -165,47 +164,77 @@ function parseFramesSpec(spec, dur) {
   return [...out].filter((n) => n >= 1 && n <= dur).sort((a, b) => a - b);
 }
 
-function collectAbsoluteFrames(unitCfg, sidesArr) {
-  // Список фаз, где задан frames → [{start, duration, framesSpec}, ...] (в порядке объявления)
+/** N центральных локальных кадров (1..dur)
+ *  dur=10, N=2 → [5,6]; dur=11, N=3 → [5,6,7]
+ */
+function centerFrames(dur, count) {
+  const n = Math.max(1, Math.min(dur, Number(count) || 1));
+  if (n >= dur) return Array.from({length: dur}, (_, i) => i + 1);
+  const mid = (dur + 1) / 2; // центр в 1-индексации (может быть .5)
+  const half = (n - 1) / 2;
+  let start = Math.round(mid - half); // стараемся симметрично
+  let end = start + n - 1;
+  if (start < 1) {
+    end += 1 - start;
+    start = 1;
+  }
+  if (end > dur) {
+    start -= end - dur;
+    end = dur;
+  }
+  const out = [];
+  for (let i = start; i <= end; i++) out.push(i);
+  return out;
+}
+
+/** собрать глобальные номера кадров с учётом:
+ *  - frames-спеков (если заданы)
+ *  - ИНАЧЕ центра фазы (config_U.frames)
+ */
+function collectAbsoluteFrames(unitCfg, sidesArr, defaultCenterCount) {
+  // набираем все фазы/подфазы в порядке объявления
   const phases = [];
   for (const [key, node] of Object.entries(unitCfg)) {
     if (key === "side_cycle" || !node) continue;
 
     // форма 1: { start, duration, frames? }
-    if (isPair(node) && node.frames) {
+    if (isPair(node)) {
       phases.push({start: node.start, duration: node.duration, frames: node.frames});
       continue;
     }
 
-    // форма 2: { start:{start,duration,frames?}, cycle:{...}, end:{...}, frames? }
-    // допускаем редкую вложенность вида { start: { start:{...} , frames: ... } }
-    if (!isPair(node)) {
-      for (const [subk, subv] of Object.entries(node)) {
-        if (subk === "frames") continue;
-        if (isPair(subv) && subv.frames) {
-          phases.push({start: subv.start, duration: subv.duration, frames: subv.frames});
-        } else if (subv && isPair(subv.start) && subv.frames) {
-          phases.push({start: subv.start.start, duration: subv.start.duration, frames: subv.frames});
-        }
+    // форма 2: { start:{...}, cycle:{...}, end:{...} }
+    for (const [subk, subv] of Object.entries(node)) {
+      if (subk === "frames") continue;
+      if (isPair(subv)) {
+        phases.push({start: subv.start, duration: subv.duration, frames: subv.frames});
+      } else if (subv && isPair(subv.start)) {
+        phases.push({start: subv.start.start, duration: subv.start.duration, frames: subv.frames});
       }
     }
   }
 
   if (!phases.length) return [];
 
-  // Преобразуем локальные кадры в глобальные с учётом сторон и side_cycle
   const sideCycle = unitCfg.side_cycle;
   const result = [];
+
   for (const side of sidesArr) {
     const shift = (side - 1) * sideCycle;
+
     for (const ph of phases) {
-      const picks = parseFramesSpec(ph.frames, ph.duration);
+      const picks =
+        ph.frames && parseFramesSpec(ph.frames, ph.duration).length
+          ? parseFramesSpec(ph.frames, ph.duration)
+          : centerFrames(ph.duration, defaultCenterCount);
+
       for (const p of picks) {
         const globalIndex = shift + (ph.start - 1) + p; // 1-индексация
         result.push(globalIndex);
       }
     }
   }
+
   return [...new Set(result)].sort((a, b) => a - b);
 }
 
@@ -238,9 +267,7 @@ async function makeSprite(files, outPng, outJson) {
     manifest.push({index: i, file: path.basename(files[i]), x, y, w: W, h: H});
   }
 
-  await sharp({
-    create: {width: outW, height: outH, channels: 4, background: {r: 0, g: 0, b: 0, alpha: 0}},
-  })
+  await sharp({create: {width: outW, height: outH, channels: 4, background: {r: 0, g: 0, b: 0, alpha: 0}}})
     .composite(comps)
     .png()
     .toFile(outPng);

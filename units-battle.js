@@ -452,7 +452,8 @@ const U12 = {
   attack: {
     start: 191,
     duration: 59,
-    frames: "1-10",
+    // frames: "1-10",
+    frames: "4,7,10,15,20",
   },
 };
 
